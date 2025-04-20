@@ -1,45 +1,56 @@
-import openai
-import tkinter as tk
-from dotenv import load_dotenv
 import os
+import tkinter as tk
+from tkinter import scrolledtext
+from dotenv import load_dotenv
+import openai
+from pathlib import Path
 
-# Load the .env file
-load_dotenv()
-api_key = os.getenv("key")
+window = tk.Tk()
+window.title("OpenAI Prompt Interface")
+window.geometry("600x400")
 
-# Set the API key to your own api 
+frame = tk.Frame(window)
+frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+tk.Label(frame, text="Enter your prompt:").pack(anchor="w")
+prompt_entry = tk.Entry(frame, width=70)
+prompt_entry.pack(fill=tk.X, pady=(0, 10))
+
+tk.Label(frame, text="Response:").pack(anchor="w")
+output_text = scrolledtext.ScrolledText(frame, height=15, wrap=tk.WORD)
+output_text.pack(fill=tk.BOTH, expand=True)
+
+env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=env_path)
+api_key = os.getenv("OPENAI_API_KEY")
 openai.api_key = api_key
 
-# Function to call OpenAI's API
 def get_completion():
     prompt = prompt_entry.get()
+    output_text.delete("1.0", tk.END)
+    if not prompt:
+        output_text.insert(tk.END, "Please enter a prompt.")
+        return
+    if not openai.api_key:
+        output_text.insert(tk.END, "API key is not set. Check your .env file.")
+        return
     try:
-        response = openai.Completion.create(
-            engine="text-davinci-003",  # You can also use "gpt-3.5-turbo-instruct"
-            prompt=prompt,
-            max_tokens=100
+        output_text.insert(tk.END, "Loading...")
+        window.update()
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150,
+            temperature=0.7
         )
-        output_text.delete("1.0", tk.END)  # Clear previous output
-        output_text.insert(tk.END, response.choices[0].text.strip())
-    except Exception as e:
+        text = response.choices[0].message.content.strip()
         output_text.delete("1.0", tk.END)
+        output_text.insert(tk.END, text)
+    except Exception as e:
         output_text.insert(tk.END, f"Error: {str(e)}")
 
-# Create the GUI
-window = tk.Tk()
-window.title("OpenAI Prompt Completer")
-
-tk.Label(window, text="Enter your prompt:").pack()
-
-prompt_entry = tk.Entry(window, width=60)
-prompt_entry.pack(pady=5)
-
-submit_button = tk.Button(window, text="Submit", command=get_completion)
-submit_button.pack(pady=5)
-
-tk.Label(window, text="Output:").pack()
-
-output_text = tk.Text(window, height=10, width=60)
-output_text.pack(pady=5)
+prompt_entry.bind("<Return>", lambda event: get_completion())
+submit_button = tk.Button(frame, text="Submit", command=get_completion)
+submit_button.pack(pady=(0, 10))
 
 window.mainloop()
